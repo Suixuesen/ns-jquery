@@ -1,0 +1,766 @@
+(function (window) {
+
+    function $(selector) {
+        return new NSQuery(selector);
+    }
+
+    function NSQuery(selector) {
+
+        if (typeof selector == 'string') {
+            //调用selectAll方法,elements才有值
+            var elements;
+
+            try {
+                //可能会报错的代码,如果出现错误,则会走catch里面的代码
+                elements = this.selectAll(selector);
+
+            } catch (e) {
+                //e指的是错误的原因
+                elements = stringToDom(selector);
+                console.log(elements);
+            }
+            //将this变为了伪数组,this里面存储的就是查找到的元素
+            for (var i = 0;i < elements.length;i++) {
+                this[i] = elements[i];
+            }
+            //设置元素个数
+            this.length = elements.length;
+        } else if (selector.nodeType > 0 || selector == window) {
+            //nodeType>0代表为dom元素
+            //selector是一个dom元素
+            this[0] = selector;
+            this.length = 1;
+        } else if (selector.length) {
+            //传递的是dom数组
+            for (var i = 0;i < selector.length;i++) {
+                this[i] = selector[i];
+            }
+            this.length = selector.length;
+        }
+
+
+        //将字符串转换为dom
+        function stringToDom(str) {
+            //str = '<div><div><h1><p><span>文字</span></p></h1></div></div>'
+            //创建了一个div
+            var node = document.createElement('div');
+
+            node.innerHTML = str;
+
+            console.log(node);
+            //childNodes:获取所有的子节点,装了dom元素的数组
+            return node.childNodes;
+        }
+    }
+
+//在NSQuery原型对象添加方法
+    $.fn = NSQuery.prototype = {
+        //1.有几个形参
+        delegate: function (dom,subNode,type,fn) {
+            dom.addEventListener(type,function (event) {
+                if (subNode == event.target.nodeName.toLowerCase()) {
+                    //console.log(event.target);
+                    //通过call方法改变this指向
+                    console.log(event.target.nodeName.toLowerCase());
+                    //event.target获取目标元素
+                    fn.call(event.target);
+                }
+            },false);
+        },
+        //将dom包装为数组
+        changeDomToArray: function (dom) {
+            dom = typeof dom == 'string' ? this.selectAll(dom) : dom;
+
+            if (!dom.length) {
+                dom = [dom];
+            }
+            return dom;
+        }
+    };
+
+//原型对象里面添加方法
+// NSQuery.prototype.a = function () {
+//
+// }
+
+    $.fn.extend = $.extend = function (b) {
+        //this指的是$.fn ,$.fn = NSQuery.prototype
+        for (key in b) {
+            this[key] = b[key];
+        }
+    }
+
+//事件框架
+    $.fn.extend({
+        //添加事件
+        on: function (/*dom,*/type,fn) {
+            /*
+             dom = typeof dom == 'string' ? this.selectAll(dom) : dom;
+
+             if (!dom.length) {
+             dom = [dom];
+             }
+             */
+            // dom = this.changeDomToArray(dom);
+            //将所有的元素赋值给dom
+            // var dom = this.elements;
+            // for (var i = 0;i < this.length;i++) {
+            //     addEvent(this[i],type,fn);
+            // }
+            this.each(function () {
+                addEvent(this,type,fn);
+            });
+            return this;
+            //添加事件
+            function addEvent(dom,type,fn) {
+                //在标准浏览器中,this指的就是dom
+                //在IE里面,this指的是window
+                if (dom.addEventListener) {
+                    //标准浏览器
+                    dom.addEventListener(type,fn,false);
+                } else {
+                    //IE浏览器
+                    dom.attachEvent('on'+type,function () {
+                        fn.call(dom);
+                    });
+                }
+            }
+
+        },
+        //获取事件对象
+        getEvent: function (event) {
+            //event标准   window.event  IE浏览器
+            return event || window.event;
+        },
+        //取消冒泡
+        stopPropagation: function (event) {
+            //获取事件对象
+            var evt = this.getEvent(event);
+
+            if (evt.stopPropagation) {
+                //标准浏览器取消冒泡
+                evt.stopPropagation();
+            } else {
+                //IE浏览器取消冒泡
+                evt.cancelBubble = true;
+            }
+
+        },
+        //阻止默认事件
+        preventDefault:function (event) {
+            var evt = this.getEvent(event);
+
+            if (evt.preventDefault) {
+                //标准浏览器阻止
+                evt.preventDefault();
+            } else {
+                //IE
+                evt.returnValue = false;
+            }
+        },
+        //获取目标元素
+        target:function (event) {
+            var evt = this.getEvent(event);
+
+            return evt.target || evt.srcElement;
+        },
+        //移除事件
+        off:function (dom,type,fn) {
+            /*
+             dom = typeof dom == 'string' ? this.selectAll(dom) : dom;
+
+             if (!dom.length) {
+             dom = [dom];
+             }
+             */
+            // dom = this.changeDomToArray(dom);
+            // for (var i = 0;i < this.length;i++) {
+            //     removeEvent(this[i],type,fn);
+            // }
+
+            this.each(function () {
+                removeEvent(this,type,fn);
+            });
+            return this;
+
+            //移除
+            function removeEvent(dom,type,fn) {
+                if (dom.removeEventListener) {
+                    //标准浏览器移除事件
+                    dom.removeEventListener(type,fn,false);
+                } else  {
+                    //IE
+                    dom.detachEvent('on'+type,fn);
+                }
+            }
+        },
+        //点击事件
+        click: function (/*dom,*/fn) {
+            this.each(function () {
+                $(this).on(/*dom,*/'click',fn);
+            })
+
+        },
+        //移入移出
+        mouseenter: function (dom,fn) {
+            this.on(dom,'mouseenter',fn);
+        },
+        mouseleave: function (dom,fn) {
+            this.on(dom,'mouseleave',fn);
+        },
+    });
+
+//选择框架
+    $.fn.extend({
+        className: function (selector,dom) {
+            //要么取dom,要么取document
+            var nodeObj = dom || document;
+            if (nodeObj.getElementsByClassName) {
+                //伪数组
+                return nodeObj.getElementsByClassName(selector);
+            }
+            //查找元素
+            var nodeList = nodeObj.getElementsByTagName('*');
+
+            //将查找出来的所有元素都放进来
+            var result = [];
+
+            for (var i = 0;i < nodeList.length;i++) {
+                //取得数组里面每一个元素
+                var node = nodeList[i];
+
+                var nodeName = node.className;
+
+                if (nodeName) {
+                    //item box
+                    //根据空格分割字符串,是数组
+                    var nameList = nodeName.split(' ');
+                    //console.log(nameList);
+
+                    for (var j = 0;j < nameList.length;j++) {
+                        //获取元素的类名
+                        if (nameList[j] == selector) {
+                            result.push(node);
+                        }
+                    }
+
+                }
+
+            }
+
+            return result;
+        },
+        //组合
+        group: function (selector) {
+            var result = [];
+            //分割
+            var arr = selector.split(',');
+            //这里的this指的就是$
+            var that = this;
+            arr.forEach(function (element,index) {
+                //element:元素内容   index:下标
+                var firstChar = element.charAt(0);
+                //谁调谁就是this
+                switch (firstChar) {
+                    case '#':   //通过id获取
+                        var idNode = this.id(element.substr(1));
+                        result.push(idNode);
+                        break;//不加造成case穿透
+                    case '.':    //通过类名
+                        var classList = this.className(element.substr(1));
+                        //handleArr(classList);
+                        Array.prototype.push.apply(result,classList);
+                        break;
+                    default:       //通过标签名
+                        //tagList是一个伪数组
+                        var tagList = this.tagName(element);
+                        //handleArr(tagList);
+                        Array.prototype.push.apply(result,tagList);
+                }
+            }.bind(this));
+            //处理伪数组
+            function handleArr(list) {
+                for (var i = 0;i < list.length;i++) {
+                    result.push(list[i]);
+                }
+            }
+            return result;
+        },
+        //通过id获取元素
+        id: function (selector) {
+            //id在document只有一个
+            return document.getElementById(selector);
+        },
+        //通过tagName获取元素
+        tagName: function (selector,dom) {
+            var node = dom || document;
+            return node.getElementsByTagName(selector);
+        },
+        level: function (selector) {
+            //selector = '.box #p1 .item a';
+            var result = [];
+
+            //存储父节点
+            var parent = [];
+
+            //分割字符串
+            var arr = selector.split(' ');
+
+            arr.forEach(function (element,index) {
+                //element: .box #p1 .item a
+                //取得第一个字符
+                var firstChar = element.charAt(0);
+                //当父节点为空的时候,在document里面获取元素
+                if (parent.length == 0) {
+                    parent.push(document);
+                }
+                switch (firstChar) {
+                    case '#'://只取得一个元素
+                        result = [];
+                        result.push(this.id(element.substr(1)));
+                        parent = result;
+                        break;
+                    case '.':
+                        result = [];
+                        for (var i = 0;i < parent.length;i++) {
+                            //在父节点的基础上根据类名获取元素(伪数组)
+                            var classList = this.className(element.substr(1),parent[i]);
+                            Array.prototype.push.apply(result,classList);
+                        }
+                        parent = result;
+                        //Array.prototype.push.apply(parent,classList);
+                        break;
+                    default:
+                        result = [];
+                        for (var i = 0;i < parent.length;i++) {
+                            //在父节点的基础上取元素
+                            var tagList = this.tagName(element,parent[i]);
+                            Array.prototype.push.apply(result,tagList);
+                        }
+                        parent = result;
+
+                }
+            }.bind(this));
+
+            return result;
+        },
+        //选择所有
+        selectAll: function (selector) {
+            //如果可以使用querySelectorAll,就直接返回结果(伪数组)
+            if (document.querySelectorAll) {
+                // this.elements = document.querySelectorAll(selector);
+                return document.querySelectorAll(selector);
+                // return this;
+            }
+            //selector:.item h1,.bt
+            var result = [];
+            //分割
+            var arr = selector.split(',');
+            //遍历数组
+            arr.forEach(function (element,index) {
+                //element:  .item h1
+                //获取到的节点
+                var levelList = this.level(element);
+                Array.prototype.push.apply(result,levelList);
+            }.bind(this));
+
+            // this.elements = result;
+            return result;
+            // return this;//NSQuery对象
+        },
+    });
+
+//样式框架
+    $.fn.extend({
+        //获取样式
+        getStyle: function (dom,key) {
+
+            if (dom.currentStyle) {
+                //IE获取样式
+                return dom.currentStyle[key];
+            } else {
+                return getComputedStyle(dom,null)[key];
+            }
+
+        },
+        css: function (/*dom,*/key,value) {
+            /*
+             //判断是不是一个字符串
+             dom = typeof dom == 'string' ? this.selectAll(dom) : dom;
+             //将dom包装为一个数组,不是数组的时候才需要包装
+             if (!dom.length) {
+             dom = [dom];
+             }
+             */
+            // dom = this.changeDomToArray(dom);
+            // dom = this.elements;
+            //根据参数个数来区分三种条件
+            //获取参数
+            if (arguments.length == 2) {
+                /*
+                 //如果是数组
+                 for (var i = 0;i < this.length;i++) {
+                 this[i].style[key] = value;
+                 }
+                 */
+                this.each(function () {
+                    this.style[key] = value;
+                });
+
+            } else {
+                //有字符串
+                if (typeof key == 'string') {
+                    //只返回第一个元素的属性值
+                    return this.getStyle(this[0],key);
+
+                } else {
+                    /*
+                     for (var i = 0;i < this.length;i++) {
+                     //遍历json对象
+                     for (x in key) {
+                     this[i].style[x] = key[x];
+                     }
+                     }
+                     */
+
+                    this.each(function () {
+                        //遍历json对象{key:value,key:value}
+                        for (x in key) {
+                            //this指的是dom元素
+                            this.style[x] = key[x];
+                        }
+                    });
+                }
+
+            }
+            return this;
+        },
+        //遍历dom元素
+        each: function (fn) {
+            //this是一个伪数组,数组里面装的是每一个dom元素
+            for (var i = 0;i < this.length;i++) {
+                //将fn里面的this指向变为dom元素
+                fn.call(this[i],i,this[i]);
+            }
+        },
+        //设置属性
+        attr: function (key,value) {
+
+            if (arguments.length == 2) {
+                this.each(function () {
+                    //设置属性,this指的就是每一个dom元素
+                    this.setAttribute(key,value);
+                });
+            } else {
+                //当参数为字符串的时候
+                if (typeof key == 'string') {
+                    //this[0]dom元素
+                    return this[0].getAttribute(key);
+                } else {
+                    //json对象
+                    this.each(function () {
+                        for (k in key) {
+                            //k代表属性名,key[k]属性值
+                            this.setAttribute(k,key[k]);
+                        }
+                    })
+                }
+            }
+        },
+    });
+
+//DOM操作
+    $.fn.extend({
+        //添加类
+        addClass:function (cls) {
+            console.log(cls);
+            this.each(function () {
+                //添加
+                // this.className = cls;//会覆盖
+                //判断有没有cls,没有则添加类
+                var arr = this.className.split(' ');
+                for (var i = 0;i < arr.length;i++) {
+                    //['box1','box3']
+                    //遍历数组,如果有重复元素,则直接return
+                    if (arr[i] == cls) {
+                        //当有元素和cls相等时,直接返回
+                        return;
+                    }
+                }
+                //遍历完后,没有相同的,则添加
+                this.className = this.className + ' ' + cls;
+            })
+        },
+
+        //删除类
+        removeClass: function (cls) {
+
+            this.each(function () {
+                var arr = this.className.split(' ');//['box1']
+                var result = arr;
+                for (var i = 0;i < arr.length;i++) {
+                    //相等的时候才需要移除'box1 box' ,box1
+                    if (arr[i] === cls) {
+                        //this.className = 'box1 box'
+                        // this.className = this.className.replace(cls,'');
+                        //删除
+                        result.splice(i,1);
+                    }
+                }
+                //toString():将数组转化为字符串
+                //join():根据指定符号隔开数组的每个元素,默认是,号
+                this.className = result.join(' ');
+            });
+        },
+        //判断有没有类
+        hasClass: function (cls) {
+
+            var arr = this[0].className.split(' ');
+
+            //标记是否有类名
+            var haveClass = false;
+            for (var i = 0;i < arr.length;i++) {
+                if (arr[i] == cls) {
+                    haveClass = true;
+                }
+            }
+
+            return haveClass;
+        },
+        //显示元素
+        show: function () {
+            this.each(function () {
+                this.style.display = 'block';
+            });
+        },
+
+        //隐藏元素
+        hide: function () {
+            this.each(function () {
+                this.style.display = 'none';
+            });
+
+        },
+        //设置获取内容
+        html: function (value) {
+            if (arguments.length == 0) {
+                //获取内容
+                return this[0].innerHTML;
+            } else {
+                this.each(function () {
+                    //this指的是dom元素
+                    this.innerHTML = value;
+                })
+            }
+        },//追加节点:
+        append: function (value) {
+            //<div><h1><p><span>文字</span></p></h1></div><ul>div2</ul><div>div3</div>
+            var ele = $(value);//ele:NSQuery对象,this[0] = div,this[1]=ul,this[2]=div
+            console.log(ele);
+            //$('.box')
+            this.each(function () {
+                //要添加子节点的dom元素
+                var that = this;
+                //遍历
+                ele.each(function () {
+                    //this指的是子节点
+                    that.appendChild(this.cloneNode(true));
+                });
+            })
+        },
+        //
+        appendTo: function (dom) {
+            //this:NSQuery对象,this[0] = div,this[1]=ul,this[2]=div
+            if (dom.nodeType > 0) {
+                this.each(function () {
+                    dom.appendChild(this.cloneNode(true));
+                })
+            } else {
+                var that = this;
+                //传递的dom是NSQuery对象
+                dom.each(function () {
+                    // this指的是要添加元素的节点
+                    var _this = this;
+                    that.each(function () {
+                        // this要添加的子节点
+                        _this.appendChild(this.cloneNode(true));
+                    })
+                })
+            }
+        },
+
+        //兄弟节点
+        siblings: function () {
+            //获取到所有的兄弟节点
+            var result = getSiblings(this[0]);
+            //清空原来this里面的元素
+            //this = [];错误
+
+            for (var i = 0;i < this.length;i++) {
+                //将所有的值变为null,
+                this[i] = null;
+            }
+
+            for (var i = 0;i < result.length;i++) {
+                this[i] = result[i];
+            }
+
+            this.length = result.length;
+
+            //保证可以调用NSQuery其他方法
+            return this;
+            //获取兄弟节点
+            function getSiblings(dom) {
+                var result = [];
+                //先获取上面的兄弟节点,有的时候会取到空格
+                var pre = dom.previousSibling;
+                var next = dom.nextSibling;
+
+                while (pre) {
+                    //所有的兄弟节点的nodeType = 1
+                    if (pre.nodeType == 1) {
+                        result.push(pre);
+                    }
+                    pre = pre.previousSibling;
+                }
+                //倒序数组
+                result.reverse();
+
+                //再获取下面的兄弟节点
+                while (next) {
+                    if (next.nodeType == 1) {
+                        result.push(next);
+                    }
+                    next = next.nextSibling;
+                }
+                //上面的兄弟节点+下面的兄弟节点 = 所有的兄弟节点(数组)
+
+                return result;
+            }
+        }
+    });
+
+//位置操作
+    $.fn.extend({
+        //宽高
+        width: function (value) {
+            //考虑window
+            if (this[0] == window) {
+                //直接返回宽
+                return window.innerWidth || document.documentElement.clientWidth;
+            }
+
+            if (arguments.length == 0) {
+                return this[0].clientWidth;
+            } else  {
+                this.each(function () {
+                    //this是dom元素
+                    $(this).css('width',value + 'px');
+                })
+            }
+        },
+        height: function (value) {
+            //考虑window
+            if (this[0] == window) {
+                //直接返回宽
+                return window.innerHeight || document.documentElement.clientHeight;
+            }
+
+            if (arguments.length == 0) {
+                return this[0].clientHeight;
+            } else  {
+                this.each(function () {
+                    //this是dom元素
+                    $(this).css('height',value + 'px');
+                })
+            }
+        },
+        //向上滚动
+        scrollTop: function (value) {
+            //当为window或者document
+            if (this[0] == document || this[0] == window) {
+                //获取
+                if (arguments.length == 0) {
+                    return window.pageYOffset || document.body.scrollTop || document.documentElement.scrollTop;
+                } else {
+                    //设置
+                    window.scrollTo(0,value);
+                }
+
+            } else {
+                if (arguments.length == 0) {
+                    //获取
+                    return this[0].scrollTop;
+                } else {
+                    //设置
+                    this.each(function () {
+                        this.scrollTop = value;
+                    })
+                }
+            }
+        },
+        //向左滚动
+        scrollLeft: function (value) {
+            //当为window或者document
+            if (this[0] == document || this[0] == window) {
+                //获取
+                if (arguments.length == 0) {
+                    return window.pageXOffset || document.body.scrollLeft || document.documentElement.scrollLeft;
+                } else {
+                    //设置
+                    window.scrollTo(value,0);
+                }
+
+            } else {
+                if (arguments.length == 0) {
+                    //获取
+                    return this[0].scrollLeft;
+                } else {
+                    //设置
+                    this.each(function () {
+                        this.scrollLeft = value;
+                    })
+                }
+            }
+        },
+        offset: function () {
+            return {top: getTop(this[0]),left: getLeft(this[0])};
+            //获取到左边的距离
+            function getLeft(dom) {
+                //获取到的是具有定位的父元素
+                var parent = dom.offsetParent;
+
+                var left = dom.offsetLeft;
+                //最后会取到body,body.offsetLeft = 0;body.offsetParent为null
+                while (parent) {
+                    left = parent.offsetLeft + left;
+
+                    parent = parent.offsetParent;
+                }
+
+                return left;
+            }
+            //获取到上边的距离
+            function getTop(dom) {
+                //获取到的是具有定位的父元素
+                var parent = dom.offsetParent;
+
+                var top = dom.offsetTop;
+                //最后会取到body,body.offsetLeft = 0;body.offsetParent为null
+                while (parent) {
+                    top = parent.offsetTop + top;
+
+                    parent = parent.offsetParent;
+                }
+
+                return top;
+            }
+        }
+        ,
+    });
+
+    //挂载到全局
+    // window.$ = $;
+    // window.NSQuery = $;
+    window.$ = window.NSQuery = $;
+})(window)
